@@ -5,6 +5,8 @@ import {
   BookOpen,
   Camera,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   ClipboardList,
   Copy,
   Download,
@@ -17,9 +19,12 @@ import {
   Keyboard,
   Layers,
   Lock,
+  Menu,
   MessageSquare,
   Mic,
   MicOff,
+  PanelLeftClose,
+  PanelLeftOpen,
   PenTool,
   Plus,
   RefreshCw,
@@ -33,6 +38,7 @@ import {
   Trash2,
   Volume2,
   VolumeX,
+  X,
 } from "lucide-react";
 import { AppProcessGuide } from "@/components/AppProcessGuide";
 import { AuthRoleBar } from "@/components/AuthRoleBar";
@@ -154,6 +160,29 @@ export default function HomePage() {
   const [featureFlags, setFeatureFlags] = useState<AppFeatureFlags>(
     DEFAULT_FEATURE_FLAGS
   );
+
+  // État du bandeau menu gauche : replié/déplié (desktop) et tiroir (mobile)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("crm_btp_sidebar_collapsed");
+      if (stored !== null) {
+        setIsSidebarCollapsed(stored === "true");
+      }
+    } catch {}
+  }, []);
+
+  const toggleSidebar = () => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("crm_btp_sidebar_collapsed", String(next));
+      } catch {}
+      return next;
+    });
+  };
 
   const [speechSupported, setSpeechSupported] = useState(true);
   const [inputMode, setInputMode] = useState<"voice" | "keyboard">("voice");
@@ -985,157 +1014,419 @@ export default function HomePage() {
     setStudioPane("quote");
   };
 
+  const navItems = [
+    {
+      id: "studio" as const,
+      label: "Studio Devis",
+      sub: "Vocal, formulaire & chiffrage",
+      icon: Sparkles,
+      badge: draft.lines.length > 0 ? `${draft.lines.length} l.` : null,
+      badgeColor: "bg-blue-600 text-white",
+    },
+    {
+      id: "guide" as const,
+      label: "Guide & Processus",
+      sub: "Comprendre l'application",
+      icon: HelpCircle,
+      badge: "Tuto",
+      badgeColor: "bg-blue-900/60 text-blue-200 border border-blue-700/50",
+    },
+    {
+      id: "skills" as const,
+      label: "Métiers & Formulaires",
+      sub: "Instructions & questions chantiers",
+      icon: Sliders,
+      badge: tradeSkills.length,
+      badgeColor: "bg-slate-800 text-slate-300 border border-slate-700",
+      locked: !canManageRules,
+    },
+    {
+      id: "catalog" as const,
+      label: "Prix & MCP",
+      sub: "Ouvrages, matériaux & barèmes",
+      icon: BookOpen,
+      badge: catalog.length,
+      badgeColor: "bg-slate-800 text-slate-300 border border-slate-700",
+      locked: !canManageRules,
+    },
+    {
+      id: "history" as const,
+      label: "Historique Devis",
+      sub: "Devis sauvegardés & signés",
+      icon: History,
+      badge: savedQuotes.length,
+      badgeColor: "bg-slate-800 text-slate-300 border border-slate-700",
+    },
+    {
+      id: "settings" as const,
+      label: "Paramètres & Modules",
+      sub: "Toggles de prod & activation",
+      icon: Settings2,
+      badge: `${activeModulesCount}/8`,
+      badgeColor: "bg-emerald-950/80 text-emerald-300 border border-emerald-700/50",
+    },
+  ];
+
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50">
+    <div className="min-h-screen flex bg-slate-100 text-slate-800">
       {/* ================================================================== */}
-      {/* EN-TÊTE RESPONSIVE + BARRE D'AUTHENTIFICATION & RÔLES RLS          */}
+      {/* BACKDROP SOMBRE MOBILE (quand le menu tiroir est ouvert)          */}
       {/* ================================================================== */}
-      <header className="bg-slate-900 text-white border-b border-slate-800 px-3 sm:px-4 py-2.5 sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2.5">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-sm shrink-0">
-                DV
-              </div>
-              <div>
-                <h1 className="font-semibold text-sm sm:text-base leading-tight">
-                  Devis Vocal &amp; Clavier IA
-                </h1>
-                <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
-                  <span
-                    className={`inline-block w-2 h-2 rounded-full ${
-                      isSupabaseConfigured ? "bg-emerald-400" : "bg-amber-400"
-                    }`}
-                  />
-                  <span>{isSupabaseConfigured ? "Supabase RLS" : "Mode local"}</span>
-                  {agentProvider && (
-                    <>
-                      <span>•</span>
-                      <span>
-                        {agentProvider === "mistral" ? "Mistral API" : "Agent démo"}
-                      </span>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Rôle RLS visible dès le haut sur mobile */}
-            <div className="lg:hidden">
-              <AuthRoleBar
-                userProfile={userProfile}
-                onProfileChange={handleProfileChanged}
-                onNotify={setStatusBanner}
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between lg:justify-end gap-2.5">
-            <nav className="flex items-center gap-1 bg-slate-800 p-1 rounded-lg text-xs sm:text-sm overflow-x-auto no-scrollbar flex-1 lg:flex-initial">
-              <button
-                onClick={() => setActiveTab("studio")}
-                className={`px-2.5 sm:px-3 py-1.5 rounded-md font-medium whitespace-nowrap transition ${
-                  activeTab === "studio"
-                    ? "bg-white text-slate-900 shadow-xs"
-                    : "text-slate-300 hover:text-white"
-                }`}
-              >
-                Studio Devis
-              </button>
-              <button
-                onClick={() => setActiveTab("guide")}
-                className={`px-2.5 sm:px-3 py-1.5 rounded-md font-medium whitespace-nowrap flex items-center gap-1.5 transition ${
-                  activeTab === "guide"
-                    ? "bg-blue-600 text-white shadow-xs"
-                    : "text-slate-300 hover:text-white"
-                }`}
-              >
-                <HelpCircle className="w-3.5 h-3.5 shrink-0" />
-                Guide &amp; Processus
-              </button>
-              <button
-                onClick={() => setActiveTab("skills")}
-                className={`px-2.5 sm:px-3 py-1.5 rounded-md font-medium whitespace-nowrap flex items-center gap-1.5 transition ${
-                  activeTab === "skills"
-                    ? "bg-white text-slate-900 shadow-xs"
-                    : "text-slate-300 hover:text-white"
-                }`}
-              >
-                {!canManageRules ? (
-                  <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                ) : (
-                  <Sliders className="w-3.5 h-3.5 shrink-0" />
-                )}
-                Métiers &amp; Formulaires ({tradeSkills.length})
-              </button>
-              <button
-                onClick={() => setActiveTab("catalog")}
-                className={`px-2.5 sm:px-3 py-1.5 rounded-md font-medium whitespace-nowrap flex items-center gap-1.5 transition ${
-                  activeTab === "catalog"
-                    ? "bg-white text-slate-900 shadow-xs"
-                    : "text-slate-300 hover:text-white"
-                }`}
-              >
-                {!canManageRules ? (
-                  <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                ) : (
-                  <BookOpen className="w-3.5 h-3.5 shrink-0" />
-                )}
-                Prix &amp; MCP ({catalog.length})
-              </button>
-              <button
-                onClick={() => setActiveTab("history")}
-                className={`px-2.5 sm:px-3 py-1.5 rounded-md font-medium whitespace-nowrap flex items-center gap-1.5 transition ${
-                  activeTab === "history"
-                    ? "bg-white text-slate-900 shadow-xs"
-                    : "text-slate-300 hover:text-white"
-                }`}
-              >
-                <History className="w-3.5 h-3.5 shrink-0" />
-                Historique ({savedQuotes.length})
-              </button>
-              <button
-                onClick={() => setActiveTab("settings")}
-                className={`px-2.5 sm:px-3 py-1.5 rounded-md font-medium whitespace-nowrap flex items-center gap-1.5 transition ${
-                  activeTab === "settings"
-                    ? "bg-white text-slate-900 shadow-xs"
-                    : "text-slate-300 hover:text-white"
-                }`}
-              >
-                <Settings2 className="w-3.5 h-3.5 shrink-0" />
-                Paramètres ({activeModulesCount}/8)
-              </button>
-            </nav>
-
-            <div className="hidden lg:block">
-              <AuthRoleBar
-                userProfile={userProfile}
-                onProfileChange={handleProfileChanged}
-                onNotify={setStatusBanner}
-              />
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {statusBanner && (
-        <div className="bg-blue-50 border-b border-blue-200 px-3 sm:px-4 py-2 text-xs sm:text-sm text-blue-900">
-          <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
-            <span>{statusBanner}</span>
-            <button
-              onClick={() => setStatusBanner(null)}
-              className="text-xs font-semibold underline shrink-0"
-            >
-              Fermer
-            </button>
-          </div>
-        </div>
+      {isMobileMenuOpen && (
+        <div
+          onClick={() => setIsMobileMenuOpen(false)}
+          className="fixed inset-0 z-40 bg-slate-950/60 backdrop-blur-xs lg:hidden transition-opacity"
+          aria-hidden="true"
+        />
       )}
 
       {/* ================================================================== */}
-      {/* CONTENU PRINCIPAL                                                  */}
+      {/* BANDEAU MENU LATÉRAL À GAUCHE (AVEC TOGGLE DE REPLI)               */}
       {/* ================================================================== */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-4 pb-20 lg:pb-6">
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex flex-col bg-slate-900 text-white border-r border-slate-800 transition-all duration-300 ease-in-out lg:static lg:h-screen lg:sticky lg:top-0 ${
+          isMobileMenuOpen
+            ? "translate-x-0 shadow-2xl"
+            : "-translate-x-full lg:translate-x-0"
+        } ${
+          isSidebarCollapsed ? "lg:w-20" : "lg:w-64"
+        } w-72 select-none shrink-0`}
+      >
+        {/* Entête du menu latéral */}
+        <div className="flex items-center justify-between px-3.5 py-3 border-b border-slate-800 h-14 shrink-0">
+          {!isSidebarCollapsed ? (
+            <>
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-sm text-white shrink-0 shadow-sm">
+                  DV
+                </div>
+                <div className="min-w-0">
+                  <h2 className="font-semibold text-sm leading-tight text-white truncate">
+                    Devis Vocal BTP
+                  </h2>
+                  <p className="text-[10px] text-slate-400 truncate">
+                    IA Métier &amp; Chiffrage
+                  </p>
+                </div>
+              </div>
+
+              {/* Bouton replier sur desktop */}
+              <button
+                type="button"
+                onClick={toggleSidebar}
+                className="hidden lg:flex items-center justify-center p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                title="Replier le bandeau menu"
+              >
+                <PanelLeftClose className="w-4 h-4" />
+              </button>
+
+              {/* Bouton fermer sur mobile */}
+              <button
+                type="button"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="lg:hidden flex items-center justify-center p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                aria-label="Fermer le menu"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </>
+          ) : (
+            <div className="w-full flex items-center justify-between">
+              <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-sm text-white shadow-sm shrink-0">
+                DV
+              </div>
+              <button
+                type="button"
+                onClick={toggleSidebar}
+                className="flex items-center justify-center p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                title="Déplier le bandeau menu"
+              >
+                <PanelLeftOpen className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Liste des liens de navigation principale */}
+        <div className="flex-1 overflow-y-auto px-2.5 py-3 space-y-1.5 no-scrollbar">
+          {!isSidebarCollapsed && (
+            <div className="px-2 pt-1 pb-1.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+              Navigation
+            </div>
+          )}
+
+          {navItems.map((item) => {
+            const isActive = activeTab === item.id;
+            const Icon = item.icon;
+
+            if (isSidebarCollapsed) {
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => {
+                    setActiveTab(item.id);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  title={`${item.label} — ${item.sub}`}
+                  className={`relative w-full flex items-center justify-center h-11 rounded-xl transition group ${
+                    isActive
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : "text-slate-400 hover:text-white hover:bg-slate-800/80"
+                  }`}
+                >
+                  <Icon className="w-5 h-5 shrink-0" />
+                  {item.badge !== null && item.badge !== undefined && (
+                    <span className="absolute top-1 right-1.5 min-w-[15px] h-3.5 px-1 rounded-full text-[9px] font-bold flex items-center justify-center bg-blue-500 text-white border border-slate-900">
+                      {typeof item.badge === "number" && item.badge > 99
+                        ? "99+"
+                        : item.badge}
+                    </span>
+                  )}
+                  {item.locked && (
+                    <span className="absolute bottom-1 right-1.5">
+                      <Lock className="w-2.5 h-2.5 text-amber-400" />
+                    </span>
+                  )}
+                </button>
+              );
+            }
+
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => {
+                  setActiveTab(item.id);
+                  setIsMobileMenuOpen(false);
+                }}
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-medium text-xs sm:text-sm transition group text-left ${
+                  isActive
+                    ? "bg-blue-600 text-white shadow-sm font-semibold"
+                    : "text-slate-300 hover:text-white hover:bg-slate-800/80"
+                }`}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div
+                    className={`p-1.5 rounded-lg shrink-0 transition ${
+                      isActive
+                        ? "bg-white/20 text-white"
+                        : "bg-slate-800 text-slate-400 group-hover:text-white group-hover:bg-slate-700"
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="truncate flex items-center gap-1.5">
+                      <span>{item.label}</span>
+                      {item.locked && (
+                        <Lock className="w-3 h-3 text-amber-400 shrink-0" />
+                      )}
+                    </div>
+                    <p
+                      className={`text-[10px] truncate ${
+                        isActive ? "text-blue-100" : "text-slate-400"
+                      }`}
+                    >
+                      {item.sub}
+                    </p>
+                  </div>
+                </div>
+                {item.badge !== null && item.badge !== undefined && (
+                  <span
+                    className={`px-1.5 py-0.5 rounded-md text-[10px] font-semibold shrink-0 ml-1.5 ${
+                      isActive
+                        ? "bg-white/25 text-white"
+                        : item.badgeColor || "bg-slate-800 text-slate-300"
+                    }`}
+                  >
+                    {item.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+
+          {/* Séparateur et Actions Rapides */}
+          <div className="pt-3 pb-1">
+            <div className="border-t border-slate-800 my-2" />
+            {!isSidebarCollapsed && (
+              <div className="px-2 pt-1 pb-1.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                Actions Rapides
+              </div>
+            )}
+
+            <div className="space-y-1">
+              {/* Bouton Nouveau Devis */}
+              <button
+                type="button"
+                onClick={() => {
+                  setDraft(createEmptyDraft(draft.trade_slug, "devis"));
+                  setActiveTab("studio");
+                  setStudioPane("chat");
+                  setStatusBanner("Nouveau devis vierge initialisé.");
+                  setIsMobileMenuOpen(false);
+                }}
+                title="Créer un nouveau devis vierge"
+                className={`w-full flex items-center ${
+                  isSidebarCollapsed
+                    ? "justify-center h-10 px-0"
+                    : "gap-2.5 px-3 py-2"
+                } rounded-xl text-xs font-semibold text-blue-300 hover:text-white bg-blue-950/40 hover:bg-blue-900/60 border border-blue-900/50 transition group`}
+              >
+                <Plus className="w-4 h-4 text-blue-400 group-hover:text-blue-200 shrink-0" />
+                {!isSidebarCollapsed && <span>Nouveau Devis</span>}
+              </button>
+
+              {/* Bouton Scanner BL */}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowBlModal(true);
+                  setIsMobileMenuOpen(false);
+                }}
+                title="Scanner un Bon de Livraison (BL)"
+                className={`w-full flex items-center ${
+                  isSidebarCollapsed
+                    ? "justify-center h-10 px-0"
+                    : "gap-2.5 px-3 py-2"
+                } rounded-xl text-xs font-semibold text-amber-300 hover:text-white bg-amber-950/40 hover:bg-amber-900/60 border border-amber-900/50 transition group`}
+              >
+                <Camera className="w-4 h-4 text-amber-400 group-hover:text-amber-200 shrink-0" />
+                {!isSidebarCollapsed && <span>Scanner BL (OCR)</span>}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Pied du menu latéral : Statuts & Toggle repli */}
+        <div className="p-3 border-t border-slate-800 bg-slate-900/80 shrink-0 space-y-2">
+          {!isSidebarCollapsed ? (
+            <>
+              <div className="flex items-center justify-between text-[11px] text-slate-400">
+                <span className="flex items-center gap-1.5 truncate">
+                  <span
+                    className={`inline-block w-2 h-2 rounded-full shrink-0 ${
+                      isSupabaseConfigured ? "bg-emerald-400" : "bg-amber-400"
+                    }`}
+                  />
+                  <span className="truncate">
+                    {isSupabaseConfigured ? "Supabase Cloud" : "Mode local"}
+                  </span>
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono">
+                  {agentProvider === "mistral" ? "Mistral" : "Démo"}
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={toggleSidebar}
+                className="w-full flex items-center justify-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span>Replier le menu</span>
+              </button>
+            </>
+          ) : (
+            <div className="flex flex-col items-center gap-2">
+              <span
+                title={isSupabaseConfigured ? "Supabase Cloud connecté" : "Mode local"}
+                className={`inline-block w-2.5 h-2.5 rounded-full ${
+                  isSupabaseConfigured ? "bg-emerald-400" : "bg-amber-400"
+                }`}
+              />
+              <button
+                type="button"
+                onClick={toggleSidebar}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                title="Déplier le menu"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+        </div>
+      </aside>
+
+      {/* ================================================================== */}
+      {/* ZONE CENTRALE : HEADER REFACTORISÉ SANS DÉFILEMENT + CONTENU       */}
+      {/* ================================================================== */}
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen bg-slate-50">
+        {/* Entête haute épurée et sans bandeau à défilement */}
+        <header className="bg-slate-900 text-white border-b border-slate-800 px-3 sm:px-4 py-2.5 sticky top-0 z-30 shadow-xs">
+          <div className="max-w-7xl mx-auto flex items-center justify-between gap-2.5">
+            {/* Côté gauche : Burger mobile + Toggle repli desktop + Titre */}
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              {/* Bouton burger sur mobile */}
+              <button
+                type="button"
+                onClick={() => setIsMobileMenuOpen(true)}
+                className="lg:hidden p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition shrink-0"
+                aria-label="Ouvrir le menu de navigation"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+
+              {/* Bouton replier/déplier sur desktop */}
+              <button
+                type="button"
+                onClick={toggleSidebar}
+                className="hidden lg:inline-flex items-center justify-center p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition shrink-0"
+                title={isSidebarCollapsed ? "Déplier le bandeau de menu" : "Replier le bandeau de menu"}
+              >
+                {isSidebarCollapsed ? (
+                  <PanelLeftOpen className="w-4 h-4" />
+                ) : (
+                  <PanelLeftClose className="w-4 h-4" />
+                )}
+              </button>
+
+              {/* Titre dynamique de l'onglet actif */}
+              <div className="flex items-center gap-2 min-w-0">
+                <h1 className="font-semibold text-sm sm:text-base text-white truncate">
+                  {activeTab === "studio" && "Studio Devis Vocal & Chiffrage"}
+                  {activeTab === "guide" && "Guide d'Utilisation & Processus"}
+                  {activeTab === "skills" && "Instructions Métiers & Formulaires"}
+                  {activeTab === "catalog" && "Catalogue des Prix & MCP"}
+                  {activeTab === "history" && "Historique des Devis"}
+                  {activeTab === "settings" && "Paramètres & Activation des Modules"}
+                </h1>
+                <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-900/60 text-blue-200 border border-blue-700/60 shrink-0">
+                  {draft.document_type === "avenant_ts" ? "Avenant TS" : "Devis"}
+                </span>
+              </div>
+            </div>
+
+            {/* Côté droit : Sélecteur de rôle & Authentification RLS */}
+            <div className="flex items-center gap-2 shrink-0">
+              <AuthRoleBar
+                userProfile={userProfile}
+                onProfileChange={handleProfileChanged}
+                onNotify={setStatusBanner}
+              />
+            </div>
+          </div>
+        </header>
+
+        {statusBanner && (
+          <div className="bg-blue-50 border-b border-blue-200 px-3 sm:px-4 py-2 text-xs sm:text-sm text-blue-900">
+            <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
+              <span>{statusBanner}</span>
+              <button
+                onClick={() => setStatusBanner(null)}
+                className="text-xs font-semibold underline shrink-0"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ================================================================ */}
+        {/* CONTENU PRINCIPAL                                                */}
+        {/* ================================================================ */}
+        <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-4 pb-20 lg:pb-6">
         {/* ================================================================ */}
         {/* ONGLET 1 : STUDIO DEVIS                                          */}
         {/* ================================================================ */}
@@ -2901,6 +3192,7 @@ export default function HomePage() {
           onNotify={setStatusBanner}
         />
       )}
+      </div>
     </div>
   );
 }
