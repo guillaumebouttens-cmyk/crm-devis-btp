@@ -227,7 +227,7 @@ export async function fetchTradeSkills(): Promise<TradeSkill[]> {
       .order("name", { ascending: true });
 
     if (!error && data && data.length > 0) {
-      return data.map((row) => ({
+      const dbSkills = data.map((row) => ({
         id: String(row.id),
         slug: String(row.slug),
         name: String(row.name),
@@ -236,6 +236,30 @@ export async function fetchTradeSkills(): Promise<TradeSkill[]> {
         intake_fields: parseIntakeFields(row.intake_fields),
         updated_at: String(row.updated_at),
       }));
+
+      // Compléter automatiquement avec les skills par défaut manquants (ex: Couverture & Zinguerie)
+      const existingSlugs = new Set(dbSkills.map((s) => s.slug));
+      const missingDefaults = DEFAULT_TRADE_SKILLS.filter(
+        (s) => !existingSlugs.has(s.slug)
+      );
+
+      if (missingDefaults.length > 0) {
+        void (async () => {
+          try {
+            await sb.from("trade_skills").insert(
+              missingDefaults.map((s) => ({
+                slug: s.slug,
+                name: s.name,
+                default_vat_rate: s.default_vat_rate,
+                system_instructions: s.system_instructions,
+                intake_fields: s.intake_fields,
+              }))
+            );
+          } catch {}
+        })();
+      }
+
+      return [...dbSkills, ...missingDefaults];
     }
   }
 
@@ -243,7 +267,15 @@ export async function fetchTradeSkills(): Promise<TradeSkill[]> {
     const raw = window.localStorage.getItem(LS_SKILLS_KEY);
     if (raw) {
       try {
-        return JSON.parse(raw) as TradeSkill[];
+        const cached = JSON.parse(raw) as TradeSkill[];
+        const cachedSlugs = new Set(cached.map((s) => s.slug));
+        const missing = DEFAULT_TRADE_SKILLS.filter((s) => !cachedSlugs.has(s.slug));
+        if (missing.length > 0) {
+          const merged = [...cached, ...missing];
+          window.localStorage.setItem(LS_SKILLS_KEY, JSON.stringify(merged));
+          return merged;
+        }
+        return cached;
       } catch {
         // fallback below
       }
@@ -512,7 +544,37 @@ export async function fetchCatalog(): Promise<CatalogItem[]> {
       .order("trade_slug", { ascending: true })
       .order("name", { ascending: true });
     if (!error && data && data.length > 0) {
-      return data.map((row) => mapCatalogRow(row as Record<string, unknown>));
+      const dbItems = data.map((row) => mapCatalogRow(row as Record<string, unknown>));
+      const existingRefs = new Set(dbItems.map((c) => c.supplier_ref));
+      const missingDefaults = DEFAULT_CATALOG.filter(
+        (c) => !existingRefs.has(c.supplier_ref)
+      );
+
+      if (missingDefaults.length > 0) {
+        void (async () => {
+          try {
+            await sb.from("catalog_items").insert(
+              missingDefaults.map((c) => ({
+                supplier_ref: c.supplier_ref,
+                trade_slug: c.trade_slug,
+                name: c.name,
+                unit: c.unit,
+                item_kind: c.item_kind,
+                cost_nature: c.cost_nature,
+                hours_per_unit: c.hours_per_unit ?? 0,
+                components: c.components ?? [],
+                cost_price_ht: c.cost_price_ht,
+                margin_coef: c.margin_coef,
+                unit_price_ht: c.unit_price_ht,
+                vat_rate: c.vat_rate,
+                price_source: c.price_source,
+              }))
+            );
+          } catch {}
+        })();
+      }
+
+      return [...dbItems, ...missingDefaults];
     }
   }
 
@@ -520,7 +582,15 @@ export async function fetchCatalog(): Promise<CatalogItem[]> {
     const raw = window.localStorage.getItem(LS_CATALOG_KEY);
     if (raw) {
       try {
-        return JSON.parse(raw) as CatalogItem[];
+        const cached = JSON.parse(raw) as CatalogItem[];
+        const cachedRefs = new Set(cached.map((c) => c.supplier_ref));
+        const missing = DEFAULT_CATALOG.filter((c) => !cachedRefs.has(c.supplier_ref));
+        if (missing.length > 0) {
+          const merged = [...cached, ...missing];
+          window.localStorage.setItem(LS_CATALOG_KEY, JSON.stringify(merged));
+          return merged;
+        }
+        return cached;
       } catch {
         // fallback below
       }

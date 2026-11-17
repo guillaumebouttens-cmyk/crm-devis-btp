@@ -298,6 +298,14 @@ export default function HomePage() {
         "Oui c'est validé, prêt à faire signer",
       ];
     }
+    if (draft.trade_slug === "couverture-zinguerie") {
+      return [
+        "Réfection toiture tuiles 90 m² avec écran HPV et 2 Velux 78x118 pour M. Lefevre",
+        "Ajoute 18 ml de gouttière zinc 33 et le forfait échafaudage",
+        "Avenant TS : Remplacement de 4 chevrons pourris découverts après dépose",
+        "Oui c'est validé, prêt à faire signer le client sur mobile",
+      ];
+    }
     if (draft.trade_slug === "menuiserie-ext") {
       return [
         "1 portail coulissant 4m et 12 ml de clôture pour M. Martin",
